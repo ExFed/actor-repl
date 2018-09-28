@@ -2,17 +2,7 @@ package com.columnzero.repl.message;
 
 import akka.actor.ActorRef;
 
-public class Command {
-
-    private final String body;
-
-    public Command(String body) {
-        this.body = body;
-    }
-
-    public String getBody() {
-        return body;
-    }
+public class Command<T> extends DataMessage<T> {
 
     public static Ready ready() {
         return new Ready();
@@ -26,23 +16,30 @@ public class Command {
         return new Subscribe(subscriber);
     }
 
-    public static class Ready {
+    public Command(T body) {
+        super(body);
+    }
+
+    public Command() {
+        super(null);
+    }
+
+    public static class Ready extends Command<Void> {
 
     }
 
-    public static class Shutdown {
+    public static class Shutdown extends Command<Void> {
 
     }
 
-    public static class Subscribe {
-
-        private final ActorRef subscriber;
+    public static class Subscribe extends Command<ActorRef> {
 
         private Subscribe(ActorRef subscriber) {
-            this.subscriber = subscriber;
+            super(subscriber);
         }
+
         public ActorRef getSubscriber() {
-            return subscriber;
+            return getBody();
         }
     }
 }

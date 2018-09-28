@@ -1,27 +1,27 @@
 package com.columnzero.repl.actor;
 
-import akka.actor.ActorRef;
 import akka.actor.Props;
 import com.columnzero.repl.message.Command;
+import com.columnzero.repl.message.SynchronizedMessage;
 
 import java.io.PrintStream;
 
 public class PrintActor extends AbstractChattyActor {
 
-    public static Props stdOutProps(ActorRef notifyComplete) {
-        return Props.create(PrintActor.class, () -> new PrintActor(System.out, notifyComplete));
+    public static Props stdOutProps() {
+        return Props.create(PrintActor.class, () -> new PrintActor(System.out));
     }
 
-    public static Props stdErrProps(ActorRef notifyComplete) {
-        return Props.create(PrintActor.class, () -> new PrintActor(System.err, notifyComplete));
+    public static Props stdErrProps() {
+        return Props.create(PrintActor.class, () -> new PrintActor(System.err));
     }
 
     private final PrintStream stream;
-    private final ActorRef notifyComplete;
 
-    private PrintActor(PrintStream stream, ActorRef notifyComplete) {
+    private PrintActor(PrintStream stream) {
         this.stream = stream;
-        this.notifyComplete = notifyComplete;
+
+        getContext().getParent().tell(Command.ready(), self());
     }
 
     @Override
@@ -33,6 +33,10 @@ public class PrintActor extends AbstractChattyActor {
 
     private void onReceive(Object o) {
         stream.println(String.valueOf(o));
-        notifyComplete.tell(Command.ready(), self());
+
+        if (o instanceof SynchronizedMessage) {
+            final SynchronizedMessage<?> syn = (SynchronizedMessage<?>) o;
+            syn.acknowledge(context());
+        }
     }
 }

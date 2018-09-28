@@ -4,7 +4,8 @@ import akka.actor.ActorRef;
 import akka.actor.Props;
 import com.columnzero.repl.Task;
 import com.columnzero.repl.message.Command;
-import com.columnzero.repl.message.ObjectMessage;
+import com.columnzero.repl.message.Message;
+import com.columnzero.repl.message.SynchronizedMessage;
 
 public class TaskActor extends AbstractChattyActor {
 
@@ -21,31 +22,42 @@ public class TaskActor extends AbstractChattyActor {
         this.success = success;
         this.error = error;
         this.task = task;
+
+        getContext().getParent().tell(Command.ready(), self());
     }
 
     @Override
     public Receive createReceive() {
         return receiveBuilder()
+                .match(Command.Ready.class, () -> false, this::onCommand)
                 .match(Command.class, this::onCommand)
-                .match(ObjectMessage.class, this::onReceive)
+                .match(Message.class, this::onReceive)
                 .build();
     }
 
-    private void onCommand(Command command) {
+    private void onCommand(Command<?> command) {
 
-        final String cmd = command.getBody();
+        final String cmd = String.valueOf(command.getBody());
         switch (cmd) {
             case "shutdown":
                 log().info("Stopping: {}", getSelf());
                 context().stop(getSelf());
             default:
-                log().info("Received command: {}", cmd);
+                log().info("Received command: {}", command);
         }
     }
 
-    private void onReceive(ObjectMessage message) {
+    private void onReceive(Message<?> message) {
         try {
-            success.tell(task.execute(message.getBody()), getSelf());
+
+            final Object result;
+            if (message instanceof SynchronizedMessage) {
+                final SynchronizedMessage<?> syn = (SynchronizedMessage<?>) message;
+                result = syn.transform(task.execute(message.getBody()));
+            } else {
+                result = task.execute(message.getBody());
+            }
+            success.tell(result, getSelf());
         } catch (Exception e) {
             error.tell(e, getSelf());
         }

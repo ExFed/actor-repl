@@ -5,9 +5,11 @@ import akka.actor.ActorRefFactory;
 import akka.actor.Props;
 import com.columnzero.repl.Task;
 import com.columnzero.repl.message.Command;
+import com.columnzero.repl.message.SynchronizedMessage;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -35,37 +37,55 @@ public class ReplSupervisor extends AbstractChattyActor {
         actors.push(factory.actorOf(props, "task-" + actors.size()));
     }
 
+    private final Set<ActorRef> unreadyChildren = new HashSet<>();
+
     private ReplSupervisor(List<Task<? super Object, ?>> tasks) {
 
         final ActorRef inputPublisher = context().actorOf(InputPublisher.props(self()), "input-publisher");
-        final ActorRef outPrinter = context().actorOf(PrintActor.stdOutProps(inputPublisher), "output-printer");
-        final ActorRef errPrinter = context().actorOf(PrintActor.stdErrProps(inputPublisher), "error-printer");
+        final ActorRef outPrinter = context().actorOf(PrintActor.stdOutProps(), "output-printer");
+        final ActorRef errPrinter = context().actorOf(PrintActor.stdErrProps(), "error-printer");
 
         final LinkedList<ActorRef> taskActors = Lists.reverse(tasks).stream()
                 .collect(LinkedList::new,
                          (actors, task) -> accumulateTasks(actors, task, outPrinter, errPrinter, context()),
                          LinkedList::addAll);
         inputPublisher.tell(Command.subscribe(taskActors.peek()), self());
-        inputPublisher.tell(Command.ready(), self());
+
+        unreadyChildren.add(inputPublisher);
+        unreadyChildren.add(outPrinter);
+        unreadyChildren.add(errPrinter);
+        unreadyChildren.addAll(taskActors);
     }
 
     @Override
     public Receive createReceive() {
         return receiveBuilder()
+                .match(Command.Ready.class, cmd -> onReady())
                 .match(Command.Shutdown.class, cmd -> shutdown())
-                .match(Command.class, this::onCommand)
+                .match(SynchronizedMessage.class, this::onMessage)
                 .build();
     }
 
-    private void onCommand(Command command) {
-        final String commandBody = command.getBody();
-        if (SHUTDOWN_KEYWORDS.contains(commandBody)) {
+
+
+    private void onMessage(SynchronizedMessage<?> message) {
+        final String body = String.valueOf(message.getBody());
+        if (SHUTDOWN_KEYWORDS.contains(body)) {
             shutdown();
             return;
         }
 
-        log().info("Command received: {}", commandBody);
-        context().sender().tell(Command.ready(), self());
+        log().info("Command received: {}", body);
+        message.acknowledge(context());
+    }
+
+    private void onReady() {
+        unreadyChildren.remove(sender());
+        if (unreadyChildren.isEmpty()) {
+            for (ActorRef child : getContext().getChildren()) {
+                child.tell(Command.ready(), self());
+            }
+        }
     }
 
     private void shutdown() {
