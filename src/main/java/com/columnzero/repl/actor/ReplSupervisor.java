@@ -5,7 +5,6 @@ import akka.actor.ActorRefFactory;
 import akka.actor.Props;
 import com.columnzero.repl.Task;
 import com.columnzero.repl.message.Command;
-import com.columnzero.repl.message.SynchronizedMessage;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -25,14 +24,13 @@ public class ReplSupervisor extends AbstractChattyActor {
 
     private static void accumulateTasks(LinkedList<ActorRef> actors,
                                         Task<? super Object, ?> task,
-                                        ActorRef outActor,
-                                        ActorRef errActor,
+                                        ActorRef output,
                                         ActorRefFactory factory) {
         final Props props;
         if (actors.isEmpty()) {
-            props = TaskActor.props(outActor, errActor, task);
+            props = TaskActor.props(output, output, task);
         } else {
-            props = TaskActor.props(actors.peek(), errActor, task);
+            props = TaskActor.props(actors.peek(), output, task);
         }
         actors.push(factory.actorOf(props, "task-" + actors.size()));
     }
@@ -41,20 +39,13 @@ public class ReplSupervisor extends AbstractChattyActor {
 
     private ReplSupervisor(List<Task<? super Object, ?>> tasks) {
 
-        final ActorRef inputPublisher = context().actorOf(InputPublisher.props(self()), "input-publisher");
-        final ActorRef outPrinter = context().actorOf(PrintActor.stdOutProps(), "output-printer");
-        final ActorRef errPrinter = context().actorOf(PrintActor.stdErrProps(), "error-printer");
+        final ActorRef console = context().actorOf(TerminalActor.props(self()), "console");
 
         final LinkedList<ActorRef> taskActors = Lists.reverse(tasks).stream()
                 .collect(LinkedList::new,
-                         (actors, task) -> accumulateTasks(actors, task, outPrinter, errPrinter, context()),
+                         (actors, task) -> accumulateTasks(actors, task, console, context()),
                          LinkedList::addAll);
-        inputPublisher.tell(Command.subscribe(taskActors.peek()), self());
-
-        unreadyChildren.add(inputPublisher);
-        unreadyChildren.add(outPrinter);
-        unreadyChildren.add(errPrinter);
-        unreadyChildren.addAll(taskActors);
+        console.tell(Command.subscribe(taskActors.peek()), self());
     }
 
     @Override
@@ -62,21 +53,18 @@ public class ReplSupervisor extends AbstractChattyActor {
         return receiveBuilder()
                 .match(Command.Ready.class, cmd -> onReady())
                 .match(Command.Shutdown.class, cmd -> shutdown())
-                .match(SynchronizedMessage.class, this::onMessage)
+                .match(Command.class, this::onMessage)
                 .build();
     }
 
-
-
-    private void onMessage(SynchronizedMessage<?> message) {
-        final String body = String.valueOf(message.getBody());
+    private void onMessage(Command<?> cmd) {
+        final String body = String.valueOf(cmd.getBody());
         if (SHUTDOWN_KEYWORDS.contains(body)) {
             shutdown();
             return;
         }
 
         log().info("Command received: {}", body);
-        message.acknowledge(context());
     }
 
     private void onReady() {

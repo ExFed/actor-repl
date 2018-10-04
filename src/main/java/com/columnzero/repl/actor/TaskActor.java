@@ -5,7 +5,7 @@ import akka.actor.Props;
 import com.columnzero.repl.Task;
 import com.columnzero.repl.message.Command;
 import com.columnzero.repl.message.Message;
-import com.columnzero.repl.message.SynchronizedMessage;
+import com.columnzero.repl.message.TrackedMessage;
 
 public class TaskActor extends AbstractChattyActor {
 
@@ -51,9 +51,9 @@ public class TaskActor extends AbstractChattyActor {
         try {
 
             final Object result;
-            if (message instanceof SynchronizedMessage) {
-                final SynchronizedMessage<?> syn = (SynchronizedMessage<?>) message;
-                result = syn.transform(task.execute(message.getBody()));
+            if (message instanceof TrackedMessage) {
+                final TrackedMessage<?> syn = (TrackedMessage<?>) message;
+                result = syn.transform(getSelf(), task.execute(message.getBody()));
             } else {
                 result = task.execute(message.getBody());
             }
@@ -62,5 +62,4 @@ public class TaskActor extends AbstractChattyActor {
             error.tell(e, getSelf());
         }
     }
-
 }
