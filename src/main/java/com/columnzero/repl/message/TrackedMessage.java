@@ -7,7 +7,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 
-public class TrackedMessage<T> extends DataMessage<T> {
+public class TrackedMessage<T> extends DataMessage<T> implements Synchronized {
 
     private final int id;
     private final List<ActorRef> provenance;
@@ -39,6 +39,7 @@ public class TrackedMessage<T> extends DataMessage<T> {
         return new TrackedMessage<>(id, provenance, newValue);
     }
 
+    @Override
     public void acknowledge(ActorContext context) {
         provenance.get(0).tell(new Acknowledgement(id), context.self());
     }

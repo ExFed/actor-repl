@@ -1,8 +1,8 @@
 package com.columnzero.repl.actor;
 
 import akka.actor.Props;
+import com.columnzero.repl.message.Synchronized;
 import com.columnzero.repl.message.Command;
-import com.columnzero.repl.message.TrackedMessage;
 
 import java.io.PrintStream;
 
@@ -34,8 +34,8 @@ public class PrintActor extends AbstractChattyActor {
     private void onReceive(Object o) {
         stream.println(String.valueOf(o));
 
-        if (o instanceof TrackedMessage) {
-            final TrackedMessage<?> syn = (TrackedMessage<?>) o;
+        if (o instanceof Synchronized) {
+            final Synchronized syn = (Synchronized) o;
             syn.acknowledge(context());
         }
     }

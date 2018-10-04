@@ -2,10 +2,10 @@ package com.columnzero.repl.actor;
 
 import akka.actor.ActorRef;
 import akka.actor.Props;
+import com.columnzero.repl.message.Synchronized;
 import com.columnzero.repl.message.Command;
 import com.columnzero.repl.message.DataMessage;
 import com.columnzero.repl.message.ErrorMessage;
-import com.columnzero.repl.message.TrackedMessage;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.InputStream;
@@ -55,8 +55,8 @@ public class TerminalActor extends AbstractChattyActor {
     private void printAny(Object o) {
         out.println(String.valueOf(o));
 
-        if (o instanceof TrackedMessage) {
-            final TrackedMessage<?> syn = (TrackedMessage<?>) o;
+        if (o instanceof Synchronized) {
+            final Synchronized syn = (Synchronized) o;
             syn.acknowledge(context());
         }
     }
