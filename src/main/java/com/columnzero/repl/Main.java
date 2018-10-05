@@ -2,7 +2,7 @@ package com.columnzero.repl;
 
 import akka.actor.ActorSystem;
 import com.columnzero.repl.actor.ReplSupervisor;
-import org.apache.commons.lang3.text.WordUtils;
+import org.apache.commons.text.WordUtils;
 
 import java.util.Collections;
 
