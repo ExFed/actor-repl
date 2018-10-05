@@ -5,19 +5,12 @@ import com.columnzero.repl.actor.ReplSupervisor;
 import org.apache.commons.lang3.text.WordUtils;
 
 import java.util.Collections;
-import java.util.concurrent.ExecutionException;
 
 public class Main {
 
     public static void main(String[] args) {
-        final ActorSystem system = ActorSystem.create();
+        final ActorSystem system = ActorSystem.create("repl");
         system.actorOf(ReplSupervisor.props(Collections.singletonList(Main::capitalizeFully)));
-
-        try {
-            system.getWhenTerminated().toCompletableFuture().get();
-        } catch (InterruptedException | ExecutionException e) {
-            system.terminate();
-        }
     }
 
     private static Object capitalizeFully(Object p) throws Exception {

@@ -42,7 +42,7 @@ public class ReplSupervisor extends AbstractChattyActor {
 
     private ReplSupervisor(List<Task<? super Object, ?>> tasks) {
 
-        final ActorRef console = context().actorOf(TerminalActor.props(self()), "console");
+        final ActorRef console = context().actorOf(TerminalActor.props(), "console");
 
         final LinkedList<ActorRef> taskActors = Lists.reverse(tasks).stream()
                 .collect(LinkedList::new,
