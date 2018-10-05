@@ -4,7 +4,10 @@ import akka.actor.ActorRef;
 import akka.actor.ActorRefFactory;
 import akka.actor.Props;
 import com.columnzero.repl.Task;
-import com.columnzero.repl.message.Command;
+import com.columnzero.repl.message.signal.Signal;
+import com.columnzero.repl.message.signal.Ready;
+import com.columnzero.repl.message.signal.Shutdown;
+import com.columnzero.repl.message.signal.Subscribe;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -45,33 +48,33 @@ public class ReplSupervisor extends AbstractChattyActor {
                 .collect(LinkedList::new,
                          (actors, task) -> accumulateTasks(actors, task, console, context()),
                          LinkedList::addAll);
-        console.tell(Command.subscribe(taskActors.peek()), self());
+        console.tell(new Subscribe(taskActors.peek()), self());
     }
 
     @Override
     public Receive createReceive() {
         return receiveBuilder()
-                .match(Command.Ready.class, cmd -> onReady())
-                .match(Command.Shutdown.class, cmd -> shutdown())
-                .match(Command.class, this::onMessage)
+                .match(Ready.class, cmd -> onReady())
+                .match(Shutdown.class, cmd -> shutdown())
+                .match(Signal.class, this::onMessage)
                 .build();
     }
 
-    private void onMessage(Command<?> cmd) {
+    private void onMessage(Signal<?> cmd) {
         final String body = String.valueOf(cmd.getBody());
         if (SHUTDOWN_KEYWORDS.contains(body)) {
             shutdown();
             return;
         }
 
-        log().info("Command received: {}", body);
+        log().info("Signal received: {}", body);
     }
 
     private void onReady() {
         unreadyChildren.remove(sender());
         if (unreadyChildren.isEmpty()) {
             for (ActorRef child : getContext().getChildren()) {
-                child.tell(Command.ready(), self());
+                child.tell(Signal.ready(), self());
             }
         }
     }

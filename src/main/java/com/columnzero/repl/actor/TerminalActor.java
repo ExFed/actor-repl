@@ -3,9 +3,11 @@ package com.columnzero.repl.actor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import com.columnzero.repl.message.Synchronized;
-import com.columnzero.repl.message.Command;
+import com.columnzero.repl.message.signal.Signal;
 import com.columnzero.repl.message.DataMessage;
 import com.columnzero.repl.message.ErrorMessage;
+import com.columnzero.repl.message.signal.Ready;
+import com.columnzero.repl.message.signal.Subscribe;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.InputStream;
@@ -39,14 +41,14 @@ public class TerminalActor extends AbstractChattyActor {
     @Override
     public Receive createReceive() {
         return receiveBuilder()
-                .match(Command.Ready.class, ready -> scanForInput())
-                .match(Command.Subscribe.class, this::addSubscriber)
+                .match(Ready.class, ready -> scanForInput())
+                .match(Subscribe.class, this::addSubscriber)
                 .match(ErrorMessage.class, this::printError)
                 .matchAny(this::printAny)
                 .build();
     }
 
-    private void addSubscriber(Command.Subscribe subscribeCommand) {
+    private void addSubscriber(Subscribe subscribeCommand) {
         final ActorRef subscriber = subscribeCommand.getSubscriber();
         log().info("Adding subscriber: {}", subscriber);
         subscribers.add(subscriber);
@@ -75,7 +77,7 @@ public class TerminalActor extends AbstractChattyActor {
     private void handleInput(String line) {
         if (StringUtils.startsWith(line, COMMAND_PREFIX)) {
             final String cmd = StringUtils.removeStart(line, COMMAND_PREFIX);
-            supervisor.tell(new Command<>(cmd), self());
+            supervisor.tell(new Signal<>(cmd), self());
         } else {
             tellSubscribers(new DataMessage<>(line));
         }
