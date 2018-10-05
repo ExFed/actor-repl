@@ -41,7 +41,7 @@ public class TerminalActor extends AbstractChattyActor {
     @Override
     public Receive createReceive() {
         return receiveBuilder()
-                .match(Ready.class, () -> sender().equals(context().parent()), this::startLoop)
+                .match(Ready.class, this::startLoop)
                 .match(ReadNext.class, this::scanForInput)
                 .match(Subscribe.class, this::addSubscriber)
                 .match(DataMessage.class, this::printOut)
@@ -56,21 +56,18 @@ public class TerminalActor extends AbstractChattyActor {
         subscribers.add(subscriber);
     }
 
-    private void printOut(DataMessage o) {
-        out.println(String.valueOf(o.getBody()));
-    }
-
     private void printOut(Object o) {
         out.println(getSender());
         out.println(String.valueOf(o));
     }
 
     private void printError(ErrorMessage<?> o) {
+        err.println(getSender());
         err.println(o.getBody());
     }
 
     private void startLoop(Object obj) {
-        if (!ready) {
+        if (!ready && sender().equals(context().parent())) {
             ready = true;
             readNext();
         }

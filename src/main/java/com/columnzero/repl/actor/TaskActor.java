@@ -3,10 +3,13 @@ package com.columnzero.repl.actor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import com.columnzero.repl.Task;
-import com.columnzero.repl.message.signal.Signal;
+import com.columnzero.repl.message.DataMessage;
+import com.columnzero.repl.message.ErrorMessage;
 import com.columnzero.repl.message.Message;
 import com.columnzero.repl.message.TrackedMessage;
+import com.columnzero.repl.message.signal.Ready;
 import com.columnzero.repl.message.signal.Shutdown;
+import com.columnzero.repl.message.signal.Signal;
 import com.columnzero.repl.message.signal.Subscribe;
 
 import java.util.Collections;
@@ -43,10 +46,15 @@ public class TaskActor extends AbstractChattyActor {
     @Override
     public Receive createReceive() {
         return receiveBuilder()
+                .match(Ready.class, this::blackhole)
                 .match(Shutdown.class, this::shutdown)
                 .match(Subscribe.class, this::onSubscribe)
-                .match(Message.class, this::onReceive)
+                .match(TrackedMessage.class, this::processTracked)
+                .match(DataMessage.class, this::processData)
                 .build();
+    }
+
+    private void blackhole(Object obj) {
     }
 
     private void onSubscribe(Subscribe subscribe) {
@@ -63,25 +71,28 @@ public class TaskActor extends AbstractChattyActor {
         context().stop(getSelf());
     }
 
-    private void onReceive(Message<?> message) {
+    private void processData(DataMessage<?> message) {
         try {
-
-            final Object result;
-            if (message instanceof TrackedMessage) {
-                final TrackedMessage<?> syn = (TrackedMessage<?>) message;
-                result = syn.transform(getSelf(), task.execute(message.getBody()));
-            } else {
-                result = task.execute(message.getBody());
-            }
-            tellAll(outSubs, result);
+            final Object result = task.execute(message.getBody());
+            tellAll(outSubs, new DataMessage<>(result));
         } catch (Exception e) {
-            tellAll(errSubs, e);
+            tellAll(errSubs, new ErrorMessage<>(e));
         }
     }
 
-    private void tellAll(Set<ActorRef> actorRefs, Object result) {
+    private void processTracked(TrackedMessage<?> message) {
+        Object result;
+        try {
+            result = message.transform(getSelf(), task.execute(message.getBody()));
+            tellAll(outSubs, new DataMessage<>(result));
+        } catch (Exception e) {
+            tellAll(errSubs, new ErrorMessage<>(e));
+        }
+    }
+
+    private void tellAll(Set<ActorRef> actorRefs, Message<?> message) {
         for (ActorRef ar : actorRefs) {
-            ar.tell(result, getSelf());
+            ar.tell(message, getSelf());
         }
     }
 }
